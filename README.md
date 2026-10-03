@@ -1,50 +1,57 @@
 # EGuo Labs
 
-A static V1 website for EGuo Labs’ first-pass technical enquiry assistant. Semantic HTML, responsive CSS and vanilla JavaScript; no build, dependencies, server application, tracking or external services.
+A buildless website for quotation workflow pilots for technical B2B teams: Quote-Ready and Quote Recovery. Semantic HTML, responsive CSS and vanilla JavaScript. No package installation, server application, forms, tracking or runtime services.
 
 ## Structure
 
 ```text
-index.html                 Homepage
-privacy.html               Privacy notice
-styles.css                 Shared visual system and responsive layouts
-script.js                  Navigation, tabs, video dialog and FAQ
+index.html                  Homepage and existing Battery / Power demos
+quote-sprint/index.html      Quotation workflow pilot landing page
+privacy.html                Privacy notice
+styles.css                  Shared visual system
+script.js                   Existing navigation, tabs, video dialog and FAQ
+assets/videos/              Unmodified Battery and Power recordings
+assets/images/              Original video-frame posters
+assets/proofs/              V5 illustrative PDFs and rendered WebP previews
 favicon.svg
 robots.txt
 sitemap.xml
 .nojekyll
-assets/
-  videos/
-    battery-demo.mp4
-    charger-demo.mp4
-  images/
-    battery-demo-poster.webp
-    charger-demo-poster.webp
-qa/                        Local QA notes and review assets (gitignored)
+CNAME                       Existing production domain; do not change
+scripts/check_site.py        Dependency-free static verification
+qa/                         Local review evidence (gitignored)
 ```
 
-## Local preview
-
-From this folder:
+## Local review
 
 ```sh
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open http://localhost:8000. No installation or build is needed. Static pages can also be opened directly; use the local server for reliable video testing.
+Visit `http://127.0.0.1:8000/` and `http://127.0.0.1:8000/quote-sprint/`. The directory route also accepts `/quote-sprint` with a trailing-slash redirect. All internal links and assets use relative paths. No router or rewrite configuration is required.
 
-## GitHub Pages
+```sh
+python3 scripts/check_site.py
+node --check script.js
+```
 
-1. Commit the site files and `assets/` to the repository’s `main` branch.
-2. In **Settings → Pages**, choose **Deploy from a branch**.
-3. Choose **main**, **/(root)** and save.
-4. Test the generated GitHub Pages preview URL, including both videos and `privacy.html`.
-5. Configure the custom domain manually only after preview validation. No `CNAME` is included. Canonical, Open Graph and sitemap URLs already target `https://eguolabs.com`.
+There is no TypeScript configuration, lint script or production build. The checked-in static files are the production output. Review both pages at 1440, 1024, 768 and 390px, plus the existing video dialogs, tabs, FAQ, email links and privacy page. Local tests do not replace post-release checks of the live domain.
 
-All page and asset links are relative, supporting both project and domain hosting. There is no custom Actions workflow.
+## Deployment — approval required
 
-## Media
+Remote: `git@github.com:Eric-Guo12138/eguolabs-site.git`.
+Production: GitHub Pages, `main`, repository root, existing `eguolabs.com` domain. GitHub's built-in **pages build and deployment** workflow is visible in the repository Actions history; there is no custom workflow in this checkout. Updating production `main` triggers deployment to the live domain. No separate preview-deployment configuration was found; use the local preview for this review.
 
-Original MP4 files are unchanged. Both contain H.264 video and AAC audio. Battery: 41.17 seconds, 1920 × 968 (240:121), 1,938,683 bytes. Power: 39.20 seconds, 1920 × 1080 (16:9), 6,373,234 bytes.
+V5 work is on the local `v5-site-refresh` branch. Do not publish until Eric approves the reviewed changes. After approval, commit the reviewed files, fetch the latest `origin/main` and reconcile any new upstream changes before release. The production publication command, from the approved review branch, is:
 
-WebP posters are real source frames: battery at 26 seconds, power at 10 seconds. Videos are attached only when a demo is opened, load metadata then, and never autoplay. Native video controls support mobile and fullscreen; a direct link and text workflow summary are also provided.
+```sh
+git push origin HEAD:main
+```
+
+Do not force-push. If the push is rejected, stop and inspect the upstream changes. After the Pages workflow succeeds, check `/`, `/quote-sprint/`, `/privacy.html`, the proof PDFs and both recordings on the live domain. Preserve `CNAME`, DNS, MX and the existing provider settings.
+
+## Proofs and media
+
+The two single-page V5 PDFs were copied unchanged from the existing client-facing illustrative exports, dated 3 October 2026. WebP previews are full-page renderings of those PDFs. Both are explicitly labelled illustrative, with no customer data. The internal Micro-proof Builder and its controls are not shipped.
+
+Original videos are unchanged: Battery 41.17s, 1920×968, 1,938,683 bytes; Power 39.20s, 1920×1080, 6,373,234 bytes. Posters are actual frames at 26s and 10s respectively. Video sources are attached only when a demo is opened, use native controls and never autoplay.
