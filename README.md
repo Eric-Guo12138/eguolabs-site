@@ -1,12 +1,13 @@
 # EGuo Labs
 
-A buildless website for quotation workflow pilots for technical B2B teams: Quote-Ready and Quote Recovery. Semantic HTML, responsive CSS and vanilla JavaScript. No package installation, server application, forms, tracking or runtime services.
+A buildless website for Quote-Ready workflows for technical manufacturers, with Quote Recovery as a secondary offer. Semantic HTML, responsive CSS and vanilla JavaScript. No package installation, server application, forms, tracking or runtime services.
 
 ## Structure
 
 ```text
 index.html                  Homepage and existing Battery / Power demos
-quote-sprint/index.html      Quotation workflow pilot landing page
+quote-ready/index.html       Primary Quote-Ready Sprint landing page
+quote-sprint/index.html      Backward-compatible copy; canonical points to /quote-ready/
 privacy.html                Privacy notice
 styles.css                  Shared visual system
 script.js                   Existing navigation, tabs, video dialog and FAQ
@@ -28,14 +29,14 @@ qa/                         Local review evidence (gitignored)
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Visit `http://127.0.0.1:8000/` and `http://127.0.0.1:8000/quote-sprint/`. The directory route also accepts `/quote-sprint` with a trailing-slash redirect. All internal links and assets use relative paths. No router or rewrite configuration is required.
+Visit `http://127.0.0.1:8000/` and `http://127.0.0.1:8000/quote-ready/`. Both directory routes accept their slashless forms with a trailing-slash redirect. `/quote-sprint/` and its existing anchors remain available. All internal links and assets use relative paths. No router or rewrite configuration is required.
 
 ```sh
 python3 scripts/check_site.py
 node --check script.js
 ```
 
-There is no TypeScript configuration, lint script or production build. The checked-in static files are the production output. Review both pages at 1440, 1024, 768 and 390px, plus the existing video dialogs, tabs, FAQ, email links and privacy page. Local tests do not replace post-release checks of the live domain.
+There is no TypeScript configuration, lint script or production build. The checked-in static files are the production output. Review both sales pages and the legacy alias at 1440, 1024, 768 and 390px, plus the existing video dialogs, tabs, FAQ, email links and privacy page. Local tests do not replace post-release checks of the live domain.
 
 ## Deployment — approval required
 
@@ -48,7 +49,7 @@ V5 work is on the local `v5-site-refresh` branch. Do not publish until Eric appr
 git push origin HEAD:main
 ```
 
-Do not force-push. If the push is rejected, stop and inspect the upstream changes. After the Pages workflow succeeds, check `/`, `/quote-sprint/`, `/privacy.html`, the proof PDFs and both recordings on the live domain. Preserve `CNAME`, DNS, MX and the existing provider settings.
+Do not force-push. If the push is rejected, stop and inspect the upstream changes. After the Pages workflow succeeds, check `/`, `/quote-ready/`, `/quote-sprint/`, `/privacy.html`, the proof PDFs and both recordings on the live domain. Preserve `CNAME`, DNS, MX and the existing provider settings.
 
 ## Proofs and media
 

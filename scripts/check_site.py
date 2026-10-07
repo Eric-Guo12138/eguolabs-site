@@ -1,5 +1,4 @@
 """Dependency-free checks for the buildless EGuo Labs site. Run from any directory."""
-from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs, unquote
@@ -8,7 +7,7 @@ import hashlib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ['index.html', 'privacy.html', 'quote-sprint/index.html']
+PAGES = ['index.html', 'privacy.html', 'quote-ready/index.html', 'quote-sprint/index.html']
 
 class Page(HTMLParser):
     def __init__(self, filename):
@@ -71,14 +70,20 @@ class SiteChecks(unittest.TestCase):
                 url = urlsplit(link)
                 self.assertEqual(url.path, 'eric@eguolabs.com')
                 fields = parse_qs(url.query)
-                self.assertTrue(set(fields) <= {'subject'})
+                self.assertTrue(set(fields) <= {'subject', 'body'})
+                if 'body' in fields:
+                    self.assertEqual(fields.get('subject'), ['One RFQ test'])
+                    self.assertEqual(fields['body'], ["Hi Eric,\n\nI have an RFQ I'd like to test.\n\nCompany:\nRFQ type:\n\nThanks,"])
+                if fields.get('subject') == ['One RFQ test']:
+                    self.assertIn('body', fields)
                 if fields:
-                    self.assertIn(fields['subject'], [['EGuo Labs enquiry'], ['Quotation sprint']])
+                    self.assertIn(fields['subject'], [['EGuo Labs enquiry'], ['One RFQ test']])
         self.assertGreaterEqual(count, 10)
 
     def test_metadata_and_sitemap(self):
-        expected = {'index.html': ('EGuo Labs | Quotation Workflow Pilots', 'https://eguolabs.com/'),
-                    'quote-sprint/index.html': ('Quotation Workflow Pilot | EGuo Labs', 'https://eguolabs.com/quote-sprint/'),
+        expected = {'index.html': ('EGuo Labs — Quote-Ready Workflows for Technical Manufacturers', 'https://eguolabs.com/'),
+                    'quote-ready/index.html': ('Quote-Ready Sprint — EGuo Labs', 'https://eguolabs.com/quote-ready/'),
+                    'quote-sprint/index.html': ('Quote-Ready Sprint — EGuo Labs', 'https://eguolabs.com/quote-ready/'),
                     'privacy.html': ('Privacy | EGuo Labs', 'https://eguolabs.com/privacy.html')}
         for name, (title, canonical) in expected.items():
             html = (ROOT / name).read_text()
@@ -114,11 +119,11 @@ class SiteChecks(unittest.TestCase):
                     self.assertFalse(urlsplit(attrs.get('href', '')).scheme)
 
     def test_commercial_scope_and_proof_labels(self):
-        for name in ('index.html', 'quote-sprint/index.html'):
+        for name in ('index.html', 'quote-ready/index.html', 'quote-sprint/index.html'):
             text = (ROOT / name).read_text()
-            for phrase in ('£300', '48 hours after complete pilot input is received',
+            for phrase in ('£300', '48 hours begins after the complete agreed pilot input is received',
                            'Quote-Ready Sprint', 'Quote Recovery Sprint',
-                           'Illustrative example. No customer data used.', 'eric@eguolabs.com'):
+                           'Illustrative example — no customer data used.', 'eric@eguolabs.com'):
                 self.assertIn(phrase, text)
             for phrase in ('trusted by', 'guaranteed revenue', 'GDPR certified', 'SOC 2', '/internal/microproof'):
                 self.assertNotIn(phrase.lower(), text.lower())
@@ -130,7 +135,35 @@ class SiteChecks(unittest.TestCase):
         self.assertTrue((ROOT / '.nojekyll').exists())
         self.assertEqual((ROOT / 'CNAME').read_text().strip(), 'eguolabs.com')
         self.assertTrue((ROOT / 'quote-sprint/index.html').is_file())
+        self.assertTrue((ROOT / 'quote-ready/index.html').is_file())
         self.assertIn('https://eguolabs.com/sitemap.xml', (ROOT / 'robots.txt').read_text())
+
+    def test_one_rfq_offer_and_legacy_routes(self):
+        for name in ('index.html', 'quote-ready/index.html', 'quote-sprint/index.html'):
+            html = (ROOT / name).read_text()
+            for phrase in ('No charge', 'No obligation', 'No integration',
+                           'A short summary of recurring intake gaps.',
+                           'Your team creates and approves the quotation.'):
+                self.assertIn(phrase, html)
+            self.assertEqual(sum(tag == 'details' and attrs.get('class') == 'faq-item'
+                                 for tag, attrs in self.pages[name].nodes), 7)
+            self.assertLess(html.index('id="proofs"'), html.index('id="quote-recovery"'))
+            self.assertNotIn('Quote Recovery', html.split('</section>', 1)[0])
+        for anchor in ('quote-ready', 'quote-recovery', 'proofs', 'pilot'):
+            self.assertIn(anchor, self.pages['quote-sprint/index.html'].ids)
+        for anchor in ('examples', 'demo-battery', 'demo-power', 'use-cases', 'outcomes', 'how-it-works'):
+            self.assertIn(anchor, self.pages['index.html'].ids)
+        self.assertEqual((ROOT / 'quote-ready/index.html').read_bytes(),
+                         (ROOT / 'quote-sprint/index.html').read_bytes())
+
+    def test_proof_and_interaction_integrity(self):
+        expected = {
+            'assets/proofs/quote-ready-v5-illustrative.pdf': '2e80eea06e721a4421ddb6e51d848df8807407e5ddba7b743d31b4f52d5422b9',
+            'assets/proofs/quote-recovery-v5-illustrative.pdf': '7a83cc608a451dedf591b099d9ec479958f227ff8b3128ce92142202ac10a5da',
+            'script.js': '4f1665f3e31c78bbdd83e74209de3bf8341b356def2ae8ed1d96c4d155e5af45',
+        }
+        for name, sha in expected.items():
+            self.assertEqual(hashlib.sha256((ROOT / name).read_bytes()).hexdigest(), sha)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
