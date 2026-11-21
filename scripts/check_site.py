@@ -1,169 +1,99 @@
-"""Dependency-free checks for the buildless EGuo Labs site. Run from any directory."""
+"""Dependency-free release checks for the static sprinkler automation website."""
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit, parse_qs, unquote
-from xml.etree import ElementTree
-import hashlib
+from urllib.parse import urlsplit, unquote, parse_qs
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ['index.html', 'privacy.html', 'quote-ready/index.html', 'quote-sprint/index.html']
-
+PAGES = ['index.html', 'privacy.html', 'quote-ready/index.html', 'quote-sprint/index.html', 'privacy/index.html']
 class Page(HTMLParser):
-    def __init__(self, filename):
-        super().__init__(convert_charrefs=True)
-        self.filename = filename
-        self.nodes = []
-        self.feed((ROOT / filename).read_text())
-    def handle_starttag(self, tag, attrs):
-        self.nodes.append((tag, dict(attrs)))
+    def __init__(self, name):
+        super().__init__(); self.nodes=[]; self.feed((ROOT/name).read_text())
+    def handle_starttag(self, tag, attrs): self.nodes.append((tag,dict(attrs)))
     @property
-    def ids(self):
-        return [attrs['id'] for _, attrs in self.nodes if 'id' in attrs]
-
+    def ids(self): return [a['id'] for _,a in self.nodes if 'id' in a]
 class SiteChecks(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.pages = {name: Page(name) for name in PAGES}
-
-    def test_local_links_assets_and_anchors(self):
-        for name, page in self.pages.items():
-            for _, attrs in page.nodes:
-                for key in ('href', 'src', 'poster'):
-                    raw = attrs.get(key)
-                    if not raw:
-                        continue
-                    url = urlsplit(raw)
-                    if url.scheme or url.netloc:
-                        continue
-                    target = (ROOT / name).parent / unquote(url.path) if url.path else ROOT / name
-                    target = target.resolve()
-                    self.assertTrue(target.is_relative_to(ROOT), raw)
-                    if target.is_dir():
-                        target /= 'index.html'
-                    self.assertTrue(target.is_file(), f'{name}: {raw}')
-                    if url.fragment and target.suffix == '.html':
-                        parsed = self.pages[str(target.relative_to(ROOT))]
-                        self.assertIn(url.fragment, parsed.ids, raw)
-
-    def test_accessible_page_structure(self):
-        for name, page in self.pages.items():
-            self.assertEqual(sum(tag == 'h1' for tag, _ in page.nodes), 1, name)
-            self.assertEqual(len(page.ids), len(set(page.ids)), name)
-            for tag, attrs in page.nodes:
-                if tag == 'img':
-                    self.assertTrue(attrs.get('alt'), name)
-                    self.assertIn('width', attrs)
-                    self.assertIn('height', attrs)
-                for key in ('aria-controls', 'aria-labelledby', 'aria-describedby'):
-                    for target in attrs.get(key, '').split():
-                        self.assertIn(target, page.ids, name)
-
-    def test_email_links(self):
-        count = 0
-        for page in self.pages.values():
-            for tag, attrs in page.nodes:
-                link = attrs.get('href', '')
-                if not link.startswith('mailto:'):
-                    continue
-                count += 1
-                url = urlsplit(link)
-                self.assertEqual(url.path, 'eric@eguolabs.com')
-                fields = parse_qs(url.query)
-                self.assertTrue(set(fields) <= {'subject', 'body'})
-                if 'body' in fields:
-                    self.assertEqual(fields.get('subject'), ['One RFQ test'])
-                    self.assertEqual(fields['body'], ["Hi Eric,\n\nI have an RFQ I'd like to test.\n\nCompany:\nRFQ type:\n\nThanks,"])
-                if fields.get('subject') == ['One RFQ test']:
-                    self.assertIn('body', fields)
-                if fields:
-                    self.assertIn(fields['subject'], [['EGuo Labs enquiry'], ['One RFQ test']])
-        self.assertGreaterEqual(count, 10)
-
-    def test_metadata_and_sitemap(self):
-        expected = {'index.html': ('EGuo Labs — Quote-Ready Workflows for Technical Manufacturers', 'https://eguolabs.com/'),
-                    'quote-ready/index.html': ('Quote-Ready Sprint — EGuo Labs', 'https://eguolabs.com/quote-ready/'),
-                    'quote-sprint/index.html': ('Quote-Ready Sprint — EGuo Labs', 'https://eguolabs.com/quote-ready/'),
-                    'privacy.html': ('Privacy | EGuo Labs', 'https://eguolabs.com/privacy.html')}
-        for name, (title, canonical) in expected.items():
-            html = (ROOT / name).read_text()
-            self.assertIn('<title>' + title + '</title>', html)
-            attrs = [a for _, a in self.pages[name].nodes]
-            self.assertTrue(any(a.get('rel') == 'canonical' and a.get('href') == canonical for a in attrs))
-            self.assertTrue(any(a.get('property') == 'og:url' and a.get('content') == canonical for a in attrs))
-            self.assertTrue(any(a.get('name') == 'description' and a.get('content') for a in attrs))
-        root = ElementTree.parse(ROOT / 'sitemap.xml')
-        urls = {e.text for e in root.iter('{http://www.sitemaps.org/schemas/sitemap/0.9}loc')}
-        self.assertEqual(urls, {v[1] for v in expected.values()})
-
-    def test_existing_videos_and_posters(self):
-        videos = {'battery-demo.mp4': 'cf7b067bc79de7748700c94fd00120cf71875a952a654646ee4471bfb3da50fd',
-                  'charger-demo.mp4': '2ce36774bd001c9976174afb9f3bd41d614db287152662c79fc61af3b1ebdc12'}
-        for name, digest in videos.items():
-            self.assertEqual(hashlib.sha256((ROOT / 'assets/videos' / name).read_bytes()).hexdigest(), digest)
-            self.assertTrue((ROOT / 'assets/images' / name.replace('.mp4', '-poster.webp')).is_file())
-        videos = [a for tag, a in self.pages['index.html'].nodes if tag == 'video']
-        self.assertEqual(len(videos), 1)
-        self.assertNotIn('src', videos[0])
-        self.assertNotIn('autoplay', videos[0])
-        self.assertIn('controls', videos[0])
-        self.assertEqual(videos[0]['preload'], 'none')
-
-    def test_no_external_runtime_or_forms(self):
-        for page in self.pages.values():
-            for tag, attrs in page.nodes:
-                self.assertNotIn(tag, ('form', 'iframe'))
-                if tag in ('script', 'img', 'video', 'source'):
-                    self.assertFalse(urlsplit(attrs.get('src', '')).scheme)
-                if tag == 'link' and attrs.get('rel') == 'stylesheet':
-                    self.assertFalse(urlsplit(attrs.get('href', '')).scheme)
-
-    def test_commercial_scope_and_proof_labels(self):
-        for name in ('index.html', 'quote-ready/index.html', 'quote-sprint/index.html'):
-            text = (ROOT / name).read_text()
-            for phrase in ('£300', '48 hours begins after the complete agreed pilot input is received',
-                           'Quote-Ready Sprint', 'Quote Recovery Sprint',
-                           'Illustrative example — no customer data used.', 'eric@eguolabs.com'):
-                self.assertIn(phrase, text)
-            for phrase in ('trusted by', 'guaranteed revenue', 'GDPR certified', 'SOC 2', '/internal/microproof'):
-                self.assertNotIn(phrase.lower(), text.lower())
-        for slug in ('quote-ready', 'quote-recovery'):
-            pdf = ROOT / 'assets/proofs' / (slug + '-v5-illustrative.pdf')
-            self.assertTrue(pdf.read_bytes().startswith(b'%PDF-'))
-
-    def test_static_deployment(self):
-        self.assertTrue((ROOT / '.nojekyll').exists())
-        self.assertEqual((ROOT / 'CNAME').read_text().strip(), 'eguolabs.com')
-        self.assertTrue((ROOT / 'quote-sprint/index.html').is_file())
-        self.assertTrue((ROOT / 'quote-ready/index.html').is_file())
-        self.assertIn('https://eguolabs.com/sitemap.xml', (ROOT / 'robots.txt').read_text())
-
-    def test_one_rfq_offer_and_legacy_routes(self):
-        for name in ('index.html', 'quote-ready/index.html', 'quote-sprint/index.html'):
-            html = (ROOT / name).read_text()
-            for phrase in ('No charge', 'No obligation', 'No integration',
-                           'A short summary of recurring intake gaps.',
-                           'Your team creates and approves the quotation.'):
-                self.assertIn(phrase, html)
-            self.assertEqual(sum(tag == 'details' and attrs.get('class') == 'faq-item'
-                                 for tag, attrs in self.pages[name].nodes), 7)
-            self.assertLess(html.index('id="proofs"'), html.index('id="quote-recovery"'))
-            self.assertNotIn('Quote Recovery', html.split('</section>', 1)[0])
-        for anchor in ('quote-ready', 'quote-recovery', 'proofs', 'pilot'):
-            self.assertIn(anchor, self.pages['quote-sprint/index.html'].ids)
-        for anchor in ('examples', 'demo-battery', 'demo-power', 'use-cases', 'outcomes', 'how-it-works'):
-            self.assertIn(anchor, self.pages['index.html'].ids)
-        self.assertEqual((ROOT / 'quote-ready/index.html').read_bytes(),
-                         (ROOT / 'quote-sprint/index.html').read_bytes())
-
-    def test_proof_and_interaction_integrity(self):
-        expected = {
-            'assets/proofs/quote-ready-v5-illustrative.pdf': '2e80eea06e721a4421ddb6e51d848df8807407e5ddba7b743d31b4f52d5422b9',
-            'assets/proofs/quote-recovery-v5-illustrative.pdf': '7a83cc608a451dedf591b099d9ec479958f227ff8b3128ce92142202ac10a5da',
-            'script.js': '4f1665f3e31c78bbdd83e74209de3bf8341b356def2ae8ed1d96c4d155e5af45',
-        }
-        for name, sha in expected.items():
-            self.assertEqual(hashlib.sha256((ROOT / name).read_bytes()).hexdigest(), sha)
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    def test_links_and_anchors(self):
+        for name in PAGES:
+            for _,a in Page(name).nodes:
+                for key in ['href','src']:
+                    u=urlsplit(a.get(key,''))
+                    if not a.get(key) or u.scheme or u.netloc: continue
+                    p=((ROOT/name).parent/unquote(u.path)).resolve() if u.path else ROOT/name
+                    if p.is_dir(): p/='index.html'
+                    self.assertTrue(p.is_file(),(name,a[key]))
+                    if u.fragment and p.suffix=='.html': self.assertIn(u.fragment,Page(str(p.relative_to(ROOT))).ids)
+    def test_semantics(self):
+        for name in PAGES:
+            p=Page(name)
+            self.assertEqual(len(p.ids),len(set(p.ids)))
+            self.assertEqual(sum(t=='h1' for t,_ in p.nodes),1)
+            for t,a in p.nodes:
+                for k in ['aria-controls','aria-labelledby']:
+                    for id in a.get(k,'').split(): self.assertIn(id,p.ids)
+    def test_contact(self):
+        links=[a['href'] for _,a in Page('index.html').nodes if a.get('href','').startswith('mailto:')]
+        self.assertGreater(len(links),3)
+        for link in links:
+            u=urlsplit(link);self.assertEqual(u.path,'eric@eguolabs.com')
+            if u.query: self.assertEqual(parse_qs(u.query)['subject'],['Sprinkler Workflow Automation Enquiry'])
+    def test_old_offers_removed(self):
+        for name in PAGES:
+            s=(ROOT/name).read_text()
+            for phrase in ['Quote-Ready Sprint','Quote Recovery Sprint','£300','48-hour','battery-demo','charger-demo']:
+                self.assertNotIn(phrase,s)
+    def test_legacy_migration(self):
+        for name in PAGES[2:4]:
+            s=(ROOT/name).read_text();self.assertIn('noindex,follow',s);self.assertIn('0;url=../#solutions',s)
+    def test_interactive_contract(self):
+        p=Page('index.html');controls=[a for _,a in p.nodes if 'data-run' in a]
+        self.assertEqual(len(controls),12)
+        for id in ['P-01','P-02','P-03']: self.assertEqual(sum(a['data-run']==id for a in controls),4)
+        self.assertEqual(sum(a.get('role')=='tab' for _,a in p.nodes),13)
+        self.assertEqual(sum(t=='details' for t,_ in p.nodes),8)
+        self.assertIn('Illustrative workflow using sample data.',(ROOT/'index.html').read_text())
+    def test_tab_groups_have_one_active_panel(self):
+        nodes=Page('index.html').nodes
+        for prefix,count in [('deliverable-',3),('format-',2),('dimension-',5),('stage-',3)]:
+            tabs=[a for _,a in nodes if a.get('role')=='tab' and a.get('id','').startswith(prefix)]
+            self.assertEqual(len(tabs),count)
+            self.assertEqual(sum(a.get('aria-selected')=='true' for a in tabs),1)
+            for tab in tabs:
+                panel=next(a for _,a in nodes if a.get('id')==tab['aria-controls'])
+                self.assertEqual('hidden' not in panel,tab['aria-selected']=='true')
+                self.assertEqual(panel['aria-labelledby'],tab['id'])
+    def test_real_enquiry_form(self):
+        nodes=Page('index.html').nodes
+        forms=[a for t,a in nodes if t=='form']
+        self.assertEqual(len(forms),1)
+        self.assertEqual(forms[0]['action'],'https://formspree.io/f/xppdjdle')
+        self.assertEqual(forms[0]['method'],'post')
+        fields={a.get('name'):a for t,a in nodes if t in ['input','select','textarea']}
+        for name in ['name','email','category','message']: self.assertIn('required',fields[name])
+        self.assertNotIn('required',fields['company'])
+        self.assertIn('_gotcha',fields)
+        self.assertEqual(fields['email']['type'],'email')
+        self.assertTrue(all(a.get('type')!='file' for a in fields.values()))
+        self.assertIn('https://formspree.io/legal/privacy-policy/',(ROOT/'privacy.html').read_text())
+        self.assertIn('privacy.html',(ROOT/'privacy/index.html').read_text())
+    def test_no_external_runtime_or_research_assets(self):
+        for name in PAGES:
+            for t,a in Page(name).nodes:
+                self.assertNotIn(t,['iframe','video'])
+                if t=='script': self.assertFalse(urlsplit(a.get('src','')).scheme)
+                self.assertFalse(a.get('src','').endswith('.pdf'))
+    def test_preserved_infrastructure_and_media(self):
+        for name in ['CNAME','.nojekyll','robots.txt','favicon.svg','script.js']:
+            self.assertEqual((ROOT/name).read_bytes(),subprocess.check_output(['git','show','HEAD:'+name],cwd=ROOT))
+        self.assertEqual(subprocess.check_output(['git','diff','--name-only','--','assets/proofs','assets/videos','assets/images'],cwd=ROOT),b'')
+    def test_metadata(self):
+        s=(ROOT/'index.html').read_text()
+        self.assertIn('EGuo Labs | Bespoke Sprinkler Estimating Automation',s)
+        self.assertIn('property="og:image"',s)
+        self.assertNotIn('/quote-ready/',(ROOT/'sitemap.xml').read_text())
+    def test_accessibility_guards(self):
+        self.assertIn('prefers-reduced-motion',(ROOT/'styles.css').read_text())
+        self.assertIn('focus-visible',(ROOT/'styles.css').read_text())
+        self.assertIn('ArrowRight',(ROOT/'v2.js').read_text())
+if __name__=='__main__': unittest.main(verbosity=2)

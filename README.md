@@ -1,58 +1,63 @@
 # EGuo Labs
 
-A buildless website for Quote-Ready workflows for technical manufacturers, with Quote Recovery as a secondary offer. Semantic HTML, responsive CSS and vanilla JavaScript. No package installation, server application, forms, tracking or runtime services.
+Buildless marketing website for bespoke sprinkler estimating automation. Semantic HTML, shared responsive CSS and small vanilla JavaScript interactions. No build installation, server application, analytics or third-party JavaScript dependencies. Enquiries are submitted to the existing Formspree endpoint over HTTPS.
 
 ## Structure
 
-```text
-index.html                  Homepage and existing Battery / Power demos
-quote-ready/index.html       Primary Quote-Ready Sprint landing page
-quote-sprint/index.html      Backward-compatible copy; canonical points to /quote-ready/
-privacy.html                Privacy notice
-styles.css                  Shared visual system
-script.js                   Existing navigation, tabs, video dialog and FAQ
-assets/videos/              Unmodified Battery and Power recordings
-assets/images/              Original video-frame posters
-assets/proofs/              V5 illustrative PDFs and rendered WebP previews
-favicon.svg
-robots.txt
-sitemap.xml
-.nojekyll
-CNAME                       Existing production domain; do not change
-scripts/check_site.py        Dependency-free static verification
-qa/                         Local review evidence (gitignored)
-```
+- `index.html`: positioning, solutions, synthetic pipework explorer, example deliverables, five customisation dimensions, three contact stages, FAQ and an asynchronous enquiry form.
+- `styles.css`: shared design tokens, layouts, responsive rules and reduced-motion support.
+- `v2.js`: mobile navigation, pipe/record association, independent accessible tab groups and copy-email action.
+- `contact.js`: validation, asynchronous Formspree submission, loading, success and error handling.
+- `privacy.html`: Formspree and email-processing privacy notice; `/privacy/` redirects here.
+- `quote-ready/index.html`, `quote-sprint/index.html`: legacy migration pages, with immediate HTML refresh to the homepage solutions section and a manual fallback link. These are not HTTP 301 responses.
+- `assets/v2/social.svg`, `assets/v2/social.jpg`: original social illustration and browser-rendered JPEG.
+- `scripts/check_site.py`: dependency-free static verification.
+- `docs/v2-site-review.md`: original V2 implementation and QA handoff.
+- `docs/v2.1-site-review.md`: historical V2.1 handoff.
+- `docs/v2.1-final-release.md`: final release gates and production verification.
+- `qa/`: local screenshots, ignored by Git.
 
-## Local review
+Original `script.js`, videos, posters and proof files are retained unchanged but are not loaded or linked by the new primary website. No source research PDFs or extracted third-party drawings were added.
+
+## Local preview
 
 ```sh
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Visit `http://127.0.0.1:8000/` and `http://127.0.0.1:8000/quote-ready/`. Both directory routes accept their slashless forms with a trailing-slash redirect. `/quote-sprint/` and its existing anchors remain available. All internal links and assets use relative paths. No router or rewrite configuration is required.
+Visit http://127.0.0.1:8000/ and http://127.0.0.1:8000/privacy.html.
 
 ```sh
 python3 scripts/check_site.py
+node --check v2.js
+node --check contact.js
 node --check script.js
+git diff --check
 ```
 
-There is no TypeScript configuration, lint script or production build. The checked-in static files are the production output. Review both sales pages and the legacy alias at 1440, 1024, 768 and 390px, plus the existing video dialogs, tabs, FAQ, email links and privacy page. Local tests do not replace post-release checks of the live domain.
+There is no package manager, TypeScript configuration, lint command or production build step. The static files are the deployment output. Review at 360, 390, 768, 1024 and 1440 CSS pixels. Test keyboard selection, mobile navigation, FAQs and contact controls. Diagrams are explicitly illustrative; no extraction engine, spreadsheet export backend or customer portal is implemented.
 
-## Deployment — approval required
+## Deployment
 
-Remote: `git@github.com:Eric-Guo12138/eguolabs-site.git`.
-Production: GitHub Pages, `main`, repository root, existing `eguolabs.com` domain. GitHub's built-in **pages build and deployment** workflow is visible in the repository Actions history; there is no custom workflow in this checkout. Updating production `main` triggers deployment to the live domain. No separate preview-deployment configuration was found; use the local preview for this review.
+Existing production hosting: GitHub Pages, `main`, repository root, domain `eguolabs.com`. Keep `CNAME`, `.nojekyll`, `robots.txt`, domain records and email infrastructure unchanged. V2.1 Final publication is authorised after release gates pass. Stage only reviewed website files, fetch origin/main, stop on unexpected upstream changes and never force-push. Confirm the Pages run and live domain after publication.
 
-V5 work is on the local `v5-site-refresh` branch. Do not publish until Eric approves the reviewed changes. After approval, commit the reviewed files, fetch the latest `origin/main` and reconcile any new upstream changes before release. The production publication command, from the approved review branch, is:
+## Maintaining the design
+
+Edit page copy in the semantic HTML sections. Colour and typography tokens live at the top of `styles.css`; responsive rules follow the shared styles. Hero record descriptions and selection behaviour are in `v2.js`. Keep matching `data-run` values on each pipe and record row, and preserve tab/panel ARIA relationships. All synthetic records must remain labelled and must not become customer-result claims.
+
+## V2.1 interaction notes
+
+Primary discovery CTAs lead to `#contact`. The form posts to the existing public endpoint `https://formspree.io/f/xppdjdle` using FormData and JSON responses. Name, work email, category and workflow description are required; company is optional. The `email` field supplies Formspree's Reply-To value; `subject` is generated from a controlled category. No credentials are present in source. Only a successful HTTP response with `ok: true` produces success and resets the form. Failures retain content. A honeypot, length limits and duplicate-submit guard complement provider spam controls. Direct email remains available.
+
+Pipe records in the hero and deliverables explorer share selection state. The nested export-format tabs operate independently of the deliverable tabs, customisation dimensions and three-stage working-together component. Synthetic P-03 keeps diameter and centreline length unresolved consistently across views. No sample download is advertised.
+
+## Browser acceptance
+
+The test tools are development-only and do not ship as runtime dependencies. With Playwright installed in an isolated directory and local Chrome available:
 
 ```sh
-git push origin HEAD:main
+NODE_PATH=/tmp/eguolabs-release-qa/node_modules node scripts/browser_qa.cjs
+NODE_PATH=/tmp/eguolabs-release-qa/node_modules node scripts/contact_qa.cjs
 ```
 
-Do not force-push. If the push is rejected, stop and inspect the upstream changes. After the Pages workflow succeeds, check `/`, `/quote-ready/`, `/quote-sprint/`, `/privacy.html`, the proof PDFs and both recordings on the live domain. Preserve `CNAME`, DNS, MX and the existing provider settings.
-
-## Proofs and media
-
-The two single-page V5 PDFs were copied unchanged from the existing client-facing illustrative exports, dated 3 October 2026. WebP previews are full-page renderings of those PDFs. Both are explicitly labelled illustrative, with no customer data. The internal Micro-proof Builder and its controls are not shipped.
-
-Original videos are unchanged: Battery 41.17s, 1920×968, 1,938,683 bytes; Power 39.20s, 1920×1080, 6,373,234 bytes. Posters are actual frames at 26s and 10s respectively. Video sources are attached only when a demo is opened, use native controls and never autoplay.
+The browser suite intercepts all form POSTs; it never creates real enquiries. `QA_BASE` can select the deployed origin for the main suite. The contact edge-case suite uses localhost. Actual provider acceptance and mailbox delivery must be checked separately, with a controlled test and no automatic resubmission.
