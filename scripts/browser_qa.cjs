@@ -109,7 +109,7 @@ const endpoint = 'https://formspree.io/f/xppdjdle';
    await page.goto(base+path);await page.waitForURL(base+'/#solutions');
   }
   for(const path of ['/privacy','/privacy/','/privacy.html']){
-   await page.goto(base+path);await page.waitForURL(base+'/privacy.html');
+   await page.goto(base+path);await page.getByRole('heading',{name:'Privacy.',exact:true}).waitFor();
    assert.match(await page.locator('main').innerText(),/Formspree/);
   }
   pass('Legacy redirects and all privacy paths');
